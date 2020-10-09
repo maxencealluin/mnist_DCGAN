@@ -1,4 +1,5 @@
 import struct
+import sys
 
 import torch
 import torch.nn as nn
@@ -12,13 +13,29 @@ import utils
 torch.manual_seed(42)
 np.random.seed(42)
 
-#loading data
-x_train, y = utils.load_mnist()
+if sys.argv[1] == 'icons':
+    #loading data icons
+    icons_data = np.load('./data/Icons-50.npy', allow_pickle=True).item()
 
-print("Data shape:", x_train.shape, y.shape)
-x_train = utils.rescale_data(x_train)
-len_data = (x_train.shape[0])
+    x_train = icons_data['image']
+    y = np.array(icons_data['class'])
 
+    mask = y == int(sys.argv[2])
+    x_train = x_train[mask]
+    y = y[mask]
+
+    #cropping 2 pixel each side
+    x_train = utils.rescale_data(x_train, resize=True)
+    len_data = (x_train.shape[0])
+    print("Data shape:", x_train.shape, y.shape)
+    RGB = True
+elif sys.argv[1] == 'mnist':
+    #loading data MNIST
+    x_train, y = utils.load_mnist()
+
+    x_train = utils.rescale_data(x_train)
+    len_data = (x_train.shape[0])
+    RGB = False
 
 #Initializing variables according to DCGAN paper recommendations
 lr = 0.0002
@@ -69,7 +86,7 @@ class Generator(nn.Module):
             nn.ConvTranspose2d(256, 128, 4, stride=2, padding = 2, bias = False),
             nn.BatchNorm2d(128),
             lrelu,
-            nn.ConvTranspose2d(128, 1, 4, stride=2, padding = 1, bias = False),
+            nn.ConvTranspose2d(128, 1 if not RGB else 3, 4, stride=2, padding = 1, bias = False),
             nn.Tanh()
         )
         self.main_linear = nn.Sequential(
@@ -103,7 +120,7 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         lrelu = nn.LeakyReLU(0.2, inplace=True)
         self.main = nn.Sequential(
-        nn.Conv2d(1, 16, 3, padding=1, bias=False),
+        nn.Conv2d(1 if not RGB else 3, 16, 3, padding=1, bias=False),
         lrelu,
         nn.Conv2d(16, 32, 3, stride=2, padding=1, bias=False),
         nn.BatchNorm2d(32),
@@ -144,10 +161,17 @@ netD.apply(utils.weights_init)
 
 def sample_noise(bs):
     global netG
-    if netG.type == 'linear':
-        return torch.randn(bs, nz).cuda()
+    global RGB
+    if not RGB or RGB:
+        if netG.type == 'linear':
+            return torch.randn(bs, nz).cuda()
+        else:
+            return torch.randn(bs, nz, 1, 1).cuda()
     else:
-        return torch.randn(bs, nz, 1, 1).cuda()
+        if netG.type == 'linear':
+            return torch.randn(bs, nz, 3).cuda()
+        else:
+            return torch.randn(bs, nz, 3, 1, 1).cuda()
 
 def train_GAN(steps = 1, training_iter= 1000):
     running_count = 0
@@ -171,11 +195,11 @@ def train_GAN(steps = 1, training_iter= 1000):
             epoch += 1
             running_count = 0
         if i % 200 == 0:
-            utils.plot_grid(netG, sample)
+            utils.plot_grid(netG, sample, RGB=RGB)
             plt.pause(0.00005)
         for s in range(steps):
             opti_netD.zero_grad()
-            x_true = torch.Tensor(x_sub[np.random.randint(0, len(x_sub), size=bs),:,:]).view(-1, 1, 28, 28).cuda()
+            x_true = torch.Tensor(x_sub[np.random.randint(0, len(x_sub), size=bs),:,:]).view(-1, 1 if not RGB else 3, 28, 28).cuda()
             y_true = torch.ones(x_true.shape[0]).cuda()
             x_false = sample_noise(bs)
             y_false = torch.zeros(x_false.shape[0]).cuda()
@@ -204,10 +228,10 @@ def train_GAN(steps = 1, training_iter= 1000):
             print(f"Epoch {epoch} Loss D {acc_loss_d / 20:8.3}    Loss G {acc_loss_g / 20:7.3}")
             acc_loss_d = 0
             acc_loss_g = 0
-        if epoch > 10:
+        if epoch > 5000:
             break
         # true = sum(y_hat.max(1)[1].detach().cpu().numpy() == batch_y.detach().cpu().numpy())
         # print(f"batch accuracy: {round(true / bs, 2)}")
         # break
 
-train_GAN(1, 10000)
+train_GAN(1, 1000000)

@@ -8,11 +8,24 @@ def show_img(image):
     plt.imshow((image + 1) / 2)
     plt.show()
 
-def plot_grid(gen, sample):
+def plot_grid(gen, sample, RGB=False):
     out = gen(sample).squeeze().detach().cpu().numpy()
+    print(out.shape)
+    if RGB:
+        out = np.moveaxis(out, 1, 3)
     for i in range(16):
         plt.subplot(4,4,i+1)
-        plt.imshow(out[i, :, :], cmap='gray')
+        plt.tick_params(
+        axis='both',  
+        which='both', 
+        bottom=False,  
+        labelleft=False,
+        left=False, 
+        labelbottom=False) 
+        if RGB:
+            plt.imshow((out[i, :, :, :] + 1) / 2, vmin=0, vmax=1)
+        else:
+            plt.imshow(out[i, :, :], cmap='gray')
 
 def read_images(file):
     with open(file,'rb') as f:
@@ -30,9 +43,11 @@ def read_labels(file):
         data_1 = np.fromfile(f,  dtype=np.dtype(np.uint8)).newbyteorder(">")    
     return np.array(data_1)
 
-def rescale_data(data):
+def rescale_data(data, resize = False):
     data = data.astype(np.int32)
     data = (data - 128) / 128
+    if resize:
+        data = data[:,:,2:-2, 2:-2]
     return data
 
 def weights_init(m):
