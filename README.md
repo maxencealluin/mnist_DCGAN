@@ -1,2 +1,8 @@
-# mnist_DCGAN
-DCGAN implementation and variations on pytorch/TF/Keras
+#Introduction
+DCGAN implementation on Mnist and [icons-50](https://www.kaggle.com/danhendrycks/icons50?) on pytorch.
+Mostly following this paper https://arxiv.org/pdf/1511.06434.pdf and https://github.com/soumith/ganhacks.
+
+#Usage 
+```python dcgan.py mnist```
+```python dcgan.py icons [class] (0 to 49)```
+
